@@ -104,11 +104,8 @@ async function handleWebhook(payload: WebhookPayload) {
                     return
                 }
 
-                // Fetch PR number associated with the commit
-                const prNumber = await getPRNumberFromCommit(deploy.commit.id)
-
                 console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
-                await triggerWorkflow(service.id, service.branch, prNumber)
+                await triggerWorkflow(service.id, service.branch)
                 return
             default:
                 console.log(`unhandled webhook type ${payload.type} for service ${payload.data.serviceId}`)
@@ -118,56 +115,19 @@ async function handleWebhook(payload: WebhookPayload) {
     }
 }
 
-async function triggerWorkflow(serviceID: string, branch: string, prNumber?: number) {
-    const inputs: any = {
-        serviceID: serviceID
-    };
-
-    // Add PR number if available
-    if (prNumber) {
-        inputs.prNumber = prNumber.toString();
-    }
-
+async function triggerWorkflow(serviceID: string, branch: string) {
     await octokit.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
         owner: githubOwnerName,
         repo: githubRepoName,
         workflow_id: githubWorkflowID,
         ref: branch,
-        inputs: inputs,
+        inputs: {
+            serviceID: serviceID
+        },
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
         }
     })
-}
-
-// getPRNumberFromCommit finds the PR number associated with a commit SHA
-async function getPRNumberFromCommit(commitSha: string): Promise<number | undefined> {
-    try {
-        console.log(`looking for PR associated with commit ${commitSha}`)
-        
-        // Search for PRs that contain this commit
-        const response = await octokit.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
-            owner: githubOwnerName,
-            repo: githubRepoName,
-            commit_sha: commitSha,
-            headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-            }
-        });
-
-        if (response.data && response.data.length > 0) {
-            // Return the first PR number found
-            const prNumber = response.data[0].number;
-            console.log(`found PR #${prNumber} for commit ${commitSha}`);
-            return prNumber;
-        } else {
-            console.log(`no PR found for commit ${commitSha}`);
-            return undefined;
-        }
-    } catch (error) {
-        console.error(`error fetching PR for commit ${commitSha}:`, error);
-        return undefined;
-    }
 }
 
 // fetchEventInfo fetches the event that triggered the webhook
