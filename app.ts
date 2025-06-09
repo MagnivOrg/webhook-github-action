@@ -99,10 +99,10 @@ async function handleWebhook(payload: WebhookPayload) {
 
                 const service = await fetchServiceInfo(payload)
 
-                // if (! service.repo.includes(`${githubOwnerName}/${githubRepoName}`)) {
-                //     console.log(`ignoring deploy success for another service: ${service.name}`)
-                //     return
-                // }
+                if (! service.repo.includes(`${githubOwnerName}/${githubRepoName}`)) {
+                    console.log(`ignoring deploy success for another service: ${service.name}`)
+                    return
+                }
 
                 console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
                 await triggerWorkflow(service.id, service.branch)
