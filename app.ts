@@ -104,25 +104,8 @@ async function handleWebhook(payload: WebhookPayload) {
                     return
                 }
 
-                let prNumber: string | undefined;
-		try {
-		    const prs = await octokit.request('GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls', {
-		        owner: githubOwnerName,
-		        repo: githubRepoName,
-		        commit_sha: deploy.commit.sha,
-		        headers: {
-		            'X-GitHub-Api-Version': '2022-11-28'
-		        }
-		    });
-		    
-		    if (prs.data.length > 0) {
-		        prNumber = prs.data[0].number.toString();
-		    }
-		} catch (error) {
-		    console.warn('Failed to fetch PR number:', error);
-		}
-		
-		await triggerWorkflow(service.id, service.branch, prNumber)
+                console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
+                await triggerWorkflow(service.id, service.branch)
                 return
             default:
                 console.log(`unhandled webhook type ${payload.type} for service ${payload.data.serviceId}`)
@@ -132,25 +115,17 @@ async function handleWebhook(payload: WebhookPayload) {
     }
 }
 
-async function triggerWorkflow(serviceID: string, branch: string, prNumber?: string) {
-    const inputs: { [key: string]: string } = {};
-    
-    if (prNumber) {
-        inputs.prNumber = prNumber;
-    }
-
+async function triggerWorkflow(serviceID: string, branch: string) {
     await octokit.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
         owner: githubOwnerName,
         repo: githubRepoName,
         workflow_id: githubWorkflowID,
         ref: branch,
-        inputs: inputs,
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
         }
     })
 }
-
 
 // fetchEventInfo fetches the event that triggered the webhook
 // some events have additional information that isn't in the webhook payload
