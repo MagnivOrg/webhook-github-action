@@ -1,0 +1,125 @@
+name: Reflect E2E Tests
+on:
+  # Allows you to trigger this workflow via the GitHub API
+  workflow_dispatch:
+    inputs:
+      serviceID:
+        type: string
+        description: "Render Service ID to deploy (e.g. srv-xxx)"
+jobs:
+  reflect-tests:
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start Reflect test execution
+        run: |
+          echo "Starting Reflect tests..."
+
+          RESPONSE=$(curl -s -X POST \
+            -H "X-API-KEY: ${{ env.REFLECT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "gitHub": {
+                "owner": "willburstein",
+                "repo": "prompt-layer-front-end",
+                "sha": "${{ github.sha }}"
+              },
+              "overrides": {
+                "hostnames": [{
+                  "original": "dashboard.promptlayer.com",
+                  "replacement": "front-end-pr-'$PR_NUMBER'.onrender.com"
+                }]
+              }
+            }' \
+            https://api.reflect.run/v1/suites/regression-check/executions)
+
+          echo "API Response: $RESPONSE"
+
+          # Check if we got a valid response and extract execution ID
+          if echo "$RESPONSE" | grep -q "executionId"; then
+            echo "✅ Successfully started Reflect tests"
+            EXECUTION_ID=$(echo "$RESPONSE" | grep -o '"executionId":[0-9]*' | cut -d':' -f2)
+            SUITE_URL=$(echo "$RESPONSE" | grep -o '"url":"[^"]*' | cut -d'"' -f4)
+            echo "Execution ID: $EXECUTION_ID"
+            echo "Suite URL: $SUITE_URL"
+            echo "EXECUTION_ID=$EXECUTION_ID" >> $GITHUB_ENV
+            echo "SUITE_URL=$SUITE_URL" >> $GITHUB_ENV
+          else
+            echo "❌ Failed to start Reflect tests"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Wait for test completion and show status
+        run: |
+          echo "Waiting for tests to complete..."
+          echo "Execution ID: $EXECUTION_ID"
+          echo "Suite URL: $SUITE_URL"
+
+          # Poll for completion
+          MAX_WAIT=1800  # 30 minutes
+          WAIT_TIME=0
+          POLL_INTERVAL=30
+
+          while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+            sleep $POLL_INTERVAL
+            WAIT_TIME=$((WAIT_TIME + POLL_INTERVAL))
+
+            STATUS_RESPONSE=$(curl -s -X GET \
+              -H "X-API-KEY: ${{ env.REFLECT_API_KEY }}" \
+              https://api.reflect.run/v1/suites/regression-check/executions/$EXECUTION_ID)
+
+            echo "Checking status... (waited ${WAIT_TIME}s)"
+
+            IS_FINISHED=$(echo "$STATUS_RESPONSE" | grep -o '"isFinished":[^,}]*' | cut -d':' -f2)
+
+            if [ "$IS_FINISHED" = "true" ]; then
+              echo "✅ Tests completed!"
+
+              # Extract and display results
+              STATUS=$(echo "$STATUS_RESPONSE" | grep -o '"status":"[^"]*' | cut -d'"' -f4)
+              echo "Overall Status: $STATUS"
+              echo "Results URL: $SUITE_URL"
+
+              # Parse test results
+              echo ""
+              echo "Test Results Summary:"
+              echo "===================="
+
+              # Count passed/failed tests from tests.data array
+              PASSED_COUNT=$(echo "$STATUS_RESPONSE" | grep -o '"tests":{"data":\[.*\]}' | grep -o '"status":"passed"' | wc -l)
+              FAILED_COUNT=$(echo "$STATUS_RESPONSE" | grep -o '"tests":{"data":\[.*\]}' | grep -o '"status":"failed"' | wc -l)
+
+              echo "✅ Passed: $PASSED_COUNT"
+              echo "❌ Failed: $FAILED_COUNT"
+
+              # Show failed test details if any
+              if [ $FAILED_COUNT -gt 0 ]; then
+                echo ""
+                echo "Failed Test Details:"
+                echo "==================="
+                echo "$STATUS_RESPONSE" | jq -r '.tests.data[] | select(.status == "failed") | "Test ID: \(.testId), URL: \(.startingUrl), Failure: \(.runs[0].failedStepIndex // "Unknown")"' 2>/dev/null || echo "Failed tests detected (jq not available for detailed parsing)"
+              fi
+
+              # Exit with appropriate code
+              if [ "$STATUS" = "passed" ]; then
+                echo ""
+                echo "🎉 All tests passed!"
+                exit 0
+              else
+                echo ""
+                echo "💥 Some tests failed. Check the results at: $SUITE_URL"
+                exit 1
+              fi
+            fi
+
+            echo "Tests still running..."
+          done
+
+          echo "❌ Tests did not complete within $MAX_WAIT seconds"
+          echo "Check status manually at: $SUITE_URL"
+          exit 1
