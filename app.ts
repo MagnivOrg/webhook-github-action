@@ -121,9 +121,6 @@ async function triggerWorkflow(serviceID: string, branch: string) {
         repo: githubRepoName,
         workflow_id: githubWorkflowID,
         ref: branch,
-        inputs: {
-            serviceID: serviceID
-        },
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
         }
