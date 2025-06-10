@@ -105,6 +105,7 @@ async function handleWebhook(payload: WebhookPayload) {
                 }
 
                 console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
+		console.log('SERVICE!!!!:', JSON.stringify(service))
                 await triggerWorkflow(service.id, service.branch)
                 return
             default:
