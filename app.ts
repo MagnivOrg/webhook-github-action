@@ -116,6 +116,7 @@ async function handleWebhook(payload: WebhookPayload) {
 }
 
 async function triggerWorkflow(serviceID: string, branch: string) {
+	console.log(`SENDING: ${renderExternalHostname}`);
     await octokit.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
         owner: githubOwnerName,
         repo: githubRepoName,
