@@ -103,10 +103,11 @@ async function handleWebhook(payload: WebhookPayload) {
                     console.log(`ignoring deploy success for another service: ${service.name}`)
                     return
                 }
+		const hostname = service.serviceDetails.url.replace("https://","");
 
                 console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
-		console.log('SERVICE!!!!:', JSON.stringify(service))
-                await triggerWorkflow(service.id, service.branch)
+		console.log('hostname:', hostname)
+                await triggerWorkflow(service.id, service.branch, hostname)
                 return
             default:
                 console.log(`unhandled webhook type ${payload.type} for service ${payload.data.serviceId}`)
@@ -116,7 +117,7 @@ async function handleWebhook(payload: WebhookPayload) {
     }
 }
 
-async function triggerWorkflow(serviceID: string, branch: string) {
+async function triggerWorkflow(serviceID: string, branch: string, hostname: string) {
 	console.log(`SENDING: ${renderExternalHostname}`);
     await octokit.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
         owner: githubOwnerName,
@@ -124,7 +125,7 @@ async function triggerWorkflow(serviceID: string, branch: string) {
         workflow_id: githubWorkflowID,
         ref: branch,
         inputs: {
-            hostname: renderExternalHostname
+            hostname
         },
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
