@@ -21,7 +21,7 @@ if (!renderAPIToken) {
     console.error("Error: RENDER_API_KEY is not set.");
     process.exit(1);
 }
-const renderExternalHostname = process.env.RENDER_EXTERNAL_HOSTNAME || '';
+
 const githubAPIToken = process.env.GITHUB_API_TOKEN || '';
 const githubOwnerName = process.env.GITHUB_OWNER_NAME || '';
 const githubRepoName = process.env.GITHUB_REPO_NAME || '';
@@ -103,7 +103,7 @@ async function handleWebhook(payload: WebhookPayload) {
                     console.log(`ignoring deploy success for another service: ${service.name}`)
                     return
                 }
-		const hostname = service.serviceDetails.url.replace("https://","");
+		const hostname = (service as any).serviceDetails.url.replace("https://","");
 
                 console.log(`triggering github workflow for ${githubOwnerName}/${githubRepoName} for ${service.name}`)
 		console.log('hostname:', hostname)
