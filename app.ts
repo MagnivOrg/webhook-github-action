@@ -21,7 +21,7 @@ if (!renderAPIToken) {
     console.error("Error: RENDER_API_KEY is not set.");
     process.exit(1);
 }
-
+const renderExternalHostname = process.env.RENDER_EXTERNAL_HOSTNAME || '';
 const githubAPIToken = process.env.GITHUB_API_TOKEN || '';
 const githubOwnerName = process.env.GITHUB_OWNER_NAME || '';
 const githubRepoName = process.env.GITHUB_REPO_NAME || '';
@@ -121,6 +121,9 @@ async function triggerWorkflow(serviceID: string, branch: string) {
         repo: githubRepoName,
         workflow_id: githubWorkflowID,
         ref: branch,
+        inputs: {
+            hostname: renderExternalHostname
+        },
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
         }
